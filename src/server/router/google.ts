@@ -54,21 +54,31 @@ export const googleRouter = createProtectedRouter()
       return true
     }
   })
+
+export const googleAuthorizedRouter = createProtectedRouter()
+  .middleware(async ({ ctx, next }) => {
+    const { user } = ctx.session
+    const authClient = getAuthClient()
+    const creds = await ctx.prisma.googleCredentials.findUnique({
+      where: { userId: user.id }
+    })
+    if (!creds) {
+      throw new Error('Not yet authenticated with Google')
+    }
+    authClient.setCredentials(creds)
+    return next({
+      ctx: {
+        ...ctx,
+        authClient
+      }
+    })
+  })
   .query('calendar.list', {
     async resolve({ ctx }) {
-      const { user } = ctx.session
-      const authClient = getAuthClient()
-      const creds = await ctx.prisma.googleCredentials.findUnique({
-        where: { userId: user.id }
-      })
-      if (!creds) {
-        throw new Error('Not yet authenticated with Google')
-      }
-      authClient.setCredentials(creds)
       const { data } = await google
         .calendar({
           version: 'v3',
-          auth: authClient
+          auth: ctx.authClient
         })
         .calendarList.list()
       return data.items?.filter((cal) => cal.accessRole === 'owner')
@@ -79,20 +89,32 @@ export const googleRouter = createProtectedRouter()
       calendarId: z.string()
     }),
     async resolve({ input, ctx }) {
-      const { user } = ctx.session
-      const authClient = getAuthClient()
-      const creds = await ctx.prisma.googleCredentials.findUnique({
-        where: { userId: user.id }
-      })
-      if (!creds) {
-        throw new Error('Not yet authenticated with Google')
-      }
-      authClient.setCredentials(creds)
       const now = dayjs()
       const { data } = await google
         .calendar({
           version: 'v3',
-          auth: authClient
+          auth: ctx.authClient
+        })
+        .events.list({
+          singleEvents: true,
+          showDeleted: false,
+          calendarId: input.calendarId,
+          timeMin: now.toISOString(),
+          timeMax: now.add(2, 'weeks').toISOString()
+        })
+      return data.items
+    }
+  })
+  .mutation('calendar.pull', {
+    input: z.object({
+      calendarId: z.string()
+    }),
+    async resolve({ input, ctx }) {
+      const now = dayjs()
+      const { data } = await google
+        .calendar({
+          version: 'v3',
+          auth: ctx.authClient
         })
         .events.list({
           singleEvents: true,
