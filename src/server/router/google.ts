@@ -4,18 +4,19 @@ import { createProtectedRouter } from './protected-router'
 import { google } from 'googleapis'
 import { env } from '../../env/server.mjs'
 
-const authClient = new google.auth.OAuth2(
-  env.GOOGLE_CLIENT_ID,
-  env.GOOGLE_CLIENT_SECRET,
-  env.NEXTAUTH_URL
-)
+const getAuthClient = () =>
+  new google.auth.OAuth2(
+    env.GOOGLE_CLIENT_ID,
+    env.GOOGLE_CLIENT_SECRET,
+    env.NEXTAUTH_URL
+  )
 
 const scopes = ['https://www.googleapis.com/auth/calendar']
 
 export const googleRouter = createProtectedRouter()
   .mutation('authorize', {
     async resolve() {
-      const url = authClient.generateAuthUrl({
+      const url = getAuthClient().generateAuthUrl({
         access_type: 'offline',
         prompt: 'consent',
         scope: scopes
@@ -29,7 +30,7 @@ export const googleRouter = createProtectedRouter()
     }),
     async resolve({ ctx, input }) {
       const { user } = ctx.session
-      const res = await authClient.getToken(input.code)
+      const res = await getAuthClient().getToken(input.code)
       const schema = z.object({
         access_token: z.string(),
         refresh_token: z.string(),
@@ -40,6 +41,7 @@ export const googleRouter = createProtectedRouter()
       })
       const googleCreds = schema.parse(res.tokens)
 
+      // NOTE: should encrypt this for security
       await ctx.prisma.googleCredentials.create({
         data: {
           code: input.code,
@@ -54,6 +56,20 @@ export const googleRouter = createProtectedRouter()
   .query('calendar.list', {
     async resolve({ ctx }) {
       const { user } = ctx.session
-      return []
+      const authClient = getAuthClient()
+      const creds = await ctx.prisma.googleCredentials.findUnique({
+        where: { userId: user.id }
+      })
+      if (!creds) {
+        throw new Error('Not yet authenticated with Google')
+      }
+      authClient.setCredentials(creds)
+      const { data } = await google
+        .calendar({
+          version: 'v3',
+          auth: authClient
+        })
+        .calendarList.list()
+      return data.items?.filter((cal) => cal.accessRole === 'owner')
     }
   })

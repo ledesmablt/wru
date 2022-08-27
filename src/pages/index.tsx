@@ -28,7 +28,9 @@ const Home: NextPage = () => {
       }
     }
     f()
-  }, [googleCode])
+  }, [googleCode, googleGetTokens, router])
+
+  const { data: calendars } = trpc.useQuery(['google.calendar.list'])
 
   const { data: session } = useSession()
   const { mutateAsync: authorizeGoogle } = trpc.useMutation('google.authorize')
@@ -67,6 +69,15 @@ const Home: NextPage = () => {
           <>
             <button onClick={() => signIn()}>sign in</button>
           </>
+        )}
+
+        {calendars?.length && (
+          <div className='mt-4'>
+            <p className='font-bold'>Calendars</p>
+            {calendars?.map((calendar) => {
+              return <div key={calendar.id}>{calendar.summary}</div>
+            })}
+          </div>
         )}
       </main>
     </>
