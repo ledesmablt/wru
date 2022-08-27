@@ -3,6 +3,7 @@ import { createProtectedRouter } from './protected-router'
 
 import { google } from 'googleapis'
 import { env } from '../../env/server.mjs'
+import dayjs from 'dayjs'
 
 const getAuthClient = () =>
   new google.auth.OAuth2(
@@ -71,5 +72,35 @@ export const googleRouter = createProtectedRouter()
         })
         .calendarList.list()
       return data.items?.filter((cal) => cal.accessRole === 'owner')
+    }
+  })
+  .query('calendar.events', {
+    input: z.object({
+      calendarId: z.string()
+    }),
+    async resolve({ input, ctx }) {
+      const { user } = ctx.session
+      const authClient = getAuthClient()
+      const creds = await ctx.prisma.googleCredentials.findUnique({
+        where: { userId: user.id }
+      })
+      if (!creds) {
+        throw new Error('Not yet authenticated with Google')
+      }
+      authClient.setCredentials(creds)
+      const now = dayjs()
+      const { data } = await google
+        .calendar({
+          version: 'v3',
+          auth: authClient
+        })
+        .events.list({
+          singleEvents: true,
+          showDeleted: false,
+          calendarId: input.calendarId,
+          timeMin: now.toISOString(),
+          timeMax: now.add(2, 'weeks').toISOString()
+        })
+      return data.items
     }
   })

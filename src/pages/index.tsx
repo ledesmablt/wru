@@ -1,12 +1,14 @@
+import dayjs from 'dayjs'
 import type { NextPage } from 'next'
 import { signIn, signOut, useSession } from 'next-auth/react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { trpc } from '../utils/trpc'
 
 const Home: NextPage = () => {
   const router = useRouter()
+  const [calendarId, setCalendarId] = useState('')
 
   // TODO: move this to another frontend route
   const { mutateAsync: googleGetTokens } = trpc.useMutation(
@@ -31,6 +33,17 @@ const Home: NextPage = () => {
   }, [googleCode, googleGetTokens, router])
 
   const { data: calendars } = trpc.useQuery(['google.calendar.list'])
+  const { data: events } = trpc.useQuery(
+    [
+      'google.calendar.events',
+      {
+        calendarId
+      }
+    ],
+    {
+      enabled: !!calendarId
+    }
+  )
 
   const { data: session } = useSession()
   const { mutateAsync: authorizeGoogle } = trpc.useMutation('google.authorize')
@@ -75,7 +88,31 @@ const Home: NextPage = () => {
           <div className='mt-4'>
             <p className='font-bold'>Calendars</p>
             {calendars?.map((calendar) => {
-              return <div key={calendar.id}>{calendar.summary}</div>
+              return (
+                <div
+                  key={calendar.id}
+                  onClick={() => calendar.id && setCalendarId(calendar.id)}
+                >
+                  {calendar.summary}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {events?.length && (
+          <div>
+            <p className='font-bold'>Events</p>
+            {events?.map((event) => {
+              return (
+                <div key={event.id}>
+                  {event.summary || '(untitled event)'}:{' '}
+                  {dayjs(event.originalStartTime?.dateTime).format(
+                    'MM/DD/YYYY'
+                  )}
+                  {event.location && `at ${event.location}`}
+                </div>
+              )
             })}
           </div>
         )}
