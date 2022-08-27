@@ -58,3 +58,16 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
+model GoogleCredentials {
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  code          String
+  id_token      String?
+  token_type    String?
+  scope         String
+  access_token  String
+  refresh_token String
+  expiry_date   Int?
+  updatedAt     Int
+}
