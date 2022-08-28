@@ -38,7 +38,7 @@ export const googleRouter = createProtectedRouter()
         refresh_token: z.string(),
         scope: z.string(),
         token_type: z.string(),
-        expiry_date: z.number(),
+        expiry_date: z.number().transform((v) => new Date(v)),
         id_token: z.string().optional()
       })
       const googleCreds = schema.parse(res.tokens)
@@ -49,7 +49,7 @@ export const googleRouter = createProtectedRouter()
           code: input.code,
           ...googleCreds,
           userId: user.id,
-          updatedAt: Date.now()
+          updatedAt: new Date()
         }
       })
       return true
@@ -66,7 +66,10 @@ export const googleAuthorizedRouter = createProtectedRouter()
     if (!creds) {
       throw new Error('Not yet authenticated with Google')
     }
-    authClient.setCredentials(creds)
+    authClient.setCredentials({
+      ...creds,
+      expiry_date: creds.expiry_date?.getTime()
+    })
     return next({
       ctx: {
         ...ctx,
@@ -156,23 +159,23 @@ export const googleAuthorizedRouter = createProtectedRouter()
         const schema = z.object({
           userId: z.string(),
           type: z.string(),
-          startDateTime: z.number(),
-          endDateTime: z.number(),
+          startDateTime: z.date(),
+          endDateTime: z.date(),
           title: z.string(),
           description: z.string().nullish(),
           locationId: z.string().nullish(),
           googleCalendarEventId: z.string(),
-          updatedAt: z.number()
+          updatedAt: z.date()
         })
         const parsedEvent = schema.parse({
           userId: ctx.session.user.id,
           type: 'Other',
-          startDateTime: new Date(event.start?.dateTime as string).getTime(),
-          endDateTime: new Date(event.end?.dateTime as string).getTime(),
+          startDateTime: new Date(event.start?.dateTime as string),
+          endDateTime: new Date(event.end?.dateTime as string),
           title: event.summary || 'Untitled event',
           description: event.description,
           googleCalendarEventId: event.id,
-          updatedAt: new Date().getTime()
+          updatedAt: new Date()
         })
         return parsedEvent
       }

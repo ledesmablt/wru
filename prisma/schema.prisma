@@ -60,15 +60,15 @@ model VerificationToken {
 }
 
 model GoogleCredentials {
-  userId        String  @unique
+  userId        String    @unique
   code          String
   id_token      String?
   token_type    String?
   scope         String
   access_token  String
   refresh_token String
-  expiry_date   Int?
-  updatedAt     Int
+  expiry_date   DateTime?
+  updatedAt     DateTime
 }
 
 model UserFollow {
@@ -83,14 +83,14 @@ model Activity {
   id                    String    @id @default(cuid())
   userId                String
   type                  String
-  startDateTime         Int
-  endDateTime           Int
+  startDateTime         DateTime
+  endDateTime           DateTime
   title                 String
   description           String?
   locationId            String?
   location              Location? @relation(fields: [locationId], references: [id])
   googleCalendarEventId String?
-  updatedAt             Int
+  updatedAt             DateTime
   deleted               Boolean?
 }
 
