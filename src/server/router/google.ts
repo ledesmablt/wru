@@ -162,9 +162,6 @@ export const googleAuthorizedRouter = createProtectedRouter()
       )
 
       const formatter = (event: calendar_v3.Schema$Event) => {
-        if (event.location) {
-          // TODO: handle location
-        }
         const schema = z.object({
           userId: z.string(),
           type: z.string(),
@@ -196,8 +193,32 @@ export const googleAuthorizedRouter = createProtectedRouter()
         if (!event.id) {
           continue
         }
+        let locationId = ''
+        if (event.location) {
+          // TODO: use actual location API, better validation
+          const existingLocation = await ctx.prisma.location.findFirst({
+            where: { name: event.location }
+          })
+          if (existingLocation) {
+            locationId = existingLocation.id
+          } else {
+            // TODO: actual data, insert new location
+            const newLocation = await ctx.prisma.location.create({
+              data: {
+                name: event.location,
+                geoHash: '__random',
+                coordinateX: 0,
+                coordinateY: 0
+              }
+            })
+            locationId = newLocation.id
+          }
+        }
         const existingActivity = existingMap[event.id]
         const body = formatter(event)
+        if (locationId) {
+          body.locationId = locationId
+        }
         if (existingActivity) {
           if (event.status === 'confirmed') {
             toUpdate.push({
