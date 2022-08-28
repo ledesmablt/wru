@@ -1,6 +1,7 @@
 import type { NextPage } from 'next'
 import { signIn, useSession } from 'next-auth/react'
 import Link from 'next/link'
+import Timeline from '../components/Timeline'
 
 const Home: NextPage = () => {
   const { data: session } = useSession()
@@ -14,6 +15,8 @@ const Home: NextPage = () => {
       {session?.user ? (
         <>
           <Link href='/user/profile'>my profile</Link>
+          <div className='my-2' />
+          <Timeline />
         </>
       ) : (
         <>
