@@ -10,7 +10,7 @@ const getAuthClient = () =>
   new google.auth.OAuth2(
     env.GOOGLE_CLIENT_ID,
     env.GOOGLE_CLIENT_SECRET,
-    env.NEXTAUTH_URL
+    `${env.NEXTAUTH_URL}/auth/google/oauth-redirect`
   )
 
 const scopes = ['https://www.googleapis.com/auth/calendar']
