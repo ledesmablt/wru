@@ -60,7 +60,6 @@ model VerificationToken {
 }
 
 model GoogleCredentials {
-  id            String  @id @default(cuid())
   userId        String  @unique
   code          String
   id_token      String?
@@ -70,4 +69,36 @@ model GoogleCredentials {
   refresh_token String
   expiry_date   Int?
   updatedAt     Int
+}
+
+model UserFollow {
+  id         String @id @default(cuid())
+  fromUserId String
+  toUserId   String
+
+  @@unique([fromUserId, toUserId])
+}
+
+model Activity {
+  id                    String    @id @default(cuid())
+  userId                String
+  type                  String
+  startDateTime         Int
+  endDateTime           Int
+  title                 String
+  description           String?
+  locationId            String?
+  location              Location? @relation(fields: [locationId], references: [id])
+  googleCalendarEventId String?
+  updatedAt             Int
+  deleted               Boolean?
+}
+
+model Location {
+  id          String     @id @default(cuid())
+  name        String
+  coordinateX Float
+  coordinateY Float
+  geoHash     String
+  activities  Activity[]
 }

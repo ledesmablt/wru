@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import { createProtectedRouter } from './protected-router'
 
-import { google } from 'googleapis'
+import { calendar_v3, google } from 'googleapis'
 import { env } from '../../env/server.mjs'
 import dayjs from 'dayjs'
+import { Activity } from '@prisma/client'
 
 const getAuthClient = () =>
   new google.auth.OAuth2(
@@ -105,11 +106,12 @@ export const googleAuthorizedRouter = createProtectedRouter()
       return data.items
     }
   })
-  .mutation('calendar.pull', {
+  .mutation('calendar.sync', {
     input: z.object({
       calendarId: z.string()
     }),
     async resolve({ input, ctx }) {
+      // TODO: rate limit this
       const now = dayjs()
       const { data } = await google
         .calendar({
@@ -118,11 +120,109 @@ export const googleAuthorizedRouter = createProtectedRouter()
         })
         .events.list({
           singleEvents: true,
-          showDeleted: false,
+          showDeleted: true,
           calendarId: input.calendarId,
           timeMin: now.toISOString(),
           timeMax: now.add(2, 'weeks').toISOString()
         })
-      return data.items
+
+      const events = data.items?.filter((e) => !!e.start?.dateTime)
+      if (!events?.length) {
+        return 0
+      }
+
+      const existing = await ctx.prisma.activity.findMany({
+        where: {
+          googleCalendarEventId: {
+            in: events.map((e) => e.id as string)
+          }
+        }
+      })
+      const existingMap = existing.reduce<{ [k: string]: Activity }>(
+        (obj, e) => {
+          if (!e.googleCalendarEventId) {
+            return obj
+          }
+          obj[e.googleCalendarEventId] = e
+          return obj
+        },
+        {}
+      )
+
+      const formatter = (event: calendar_v3.Schema$Event) => {
+        if (event.location) {
+          // TODO: handle location
+        }
+        const schema = z.object({
+          userId: z.string(),
+          type: z.string(),
+          startDateTime: z.number(),
+          endDateTime: z.number(),
+          title: z.string(),
+          description: z.string().nullish(),
+          locationId: z.string().nullish(),
+          googleCalendarEventId: z.string(),
+          updatedAt: z.number()
+        })
+        const parsedEvent = schema.parse({
+          userId: ctx.session.user.id,
+          type: 'Other',
+          startDateTime: new Date(event.start?.dateTime as string).getTime(),
+          endDateTime: new Date(event.end?.dateTime as string).getTime(),
+          title: event.summary || 'Untitled event',
+          description: event.description,
+          googleCalendarEventId: event.id,
+          updatedAt: new Date().getTime()
+        })
+        return parsedEvent
+      }
+
+      const toCreate: ReturnType<typeof formatter>[] = []
+      const toDelete: string[] = []
+      const toUpdate: { id: string; body: ReturnType<typeof formatter> }[] = []
+      for (const event of events) {
+        if (!event.id) {
+          continue
+        }
+        const existingActivity = existingMap[event.id]
+        const body = formatter(event)
+        if (existingActivity) {
+          if (event.status === 'confirmed') {
+            toUpdate.push({
+              id: existingActivity.id,
+              body
+            })
+          } else {
+            // delete non-confirmed events
+            toDelete.push(event.id)
+          }
+        } else {
+          toCreate.push(body)
+        }
+      }
+
+      if (toCreate.length) {
+        await ctx.prisma.activity.createMany({
+          data: toCreate
+        })
+      }
+      if (toDelete.length) {
+        await ctx.prisma.activity.deleteMany({
+          where: {
+            googleCalendarEventId: { in: toDelete }
+          }
+        })
+      }
+      if (toUpdate.length) {
+        await Promise.all(
+          toUpdate.map(({ id, body }) =>
+            ctx.prisma.activity.update({
+              where: { id },
+              data: body
+            })
+          )
+        )
+      }
+      return events.length
     }
   })
