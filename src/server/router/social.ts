@@ -59,7 +59,7 @@ export const socialRouter = createProtectedRouter()
       const activities = await ctx.prisma.activity.findMany({
         where: {
           userId: {
-            in: [user.id, ...following.map((u) => u.id)]
+            in: [user.id, ...following.map((u) => u.toUserId)]
           },
           startDateTime: {
             gte: new Date(),
@@ -77,6 +77,7 @@ export const socialRouter = createProtectedRouter()
           location: true,
           user: {
             select: {
+              id: true,
               name: true,
               image: true
             }

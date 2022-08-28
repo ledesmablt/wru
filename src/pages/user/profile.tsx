@@ -14,8 +14,14 @@ const UserProfile: NextPage = () => {
   })
   const { data: isGoogleAuthorized } = trpc.useQuery(['google.isAuthorized'])
   const { mutateAsync: authorizeGoogle } = trpc.useMutation('google.getAuthUrl')
+  const followMutation = trpc.useMutation('social.follow', {
+    onSuccess: () => {
+      setFollowEmail('')
+    }
+  })
 
   const [calendarPickerOpen, setCalendarPickerOpen] = useState(false)
+  const [followEmail, setFollowEmail] = useState('')
 
   if (!session?.user) {
     return null
@@ -47,6 +53,29 @@ const UserProfile: NextPage = () => {
           authorize google
         </button>
       )}
+      <div className='flex my-2 gap-2 items-center'>
+        <input
+          disabled={followMutation.isLoading}
+          className='border p-1'
+          placeholder='user email to follow'
+          type='text'
+          value={followEmail}
+          onChange={(e) => setFollowEmail(e.target.value)}
+        />
+        <button
+          className='border p-1'
+          disabled={!followEmail && followMutation.isLoading}
+          onClick={() =>
+            followMutation.mutate({
+              email: followEmail
+            })
+          }
+        >
+          follow
+        </button>
+      </div>
+      {followMutation.isSuccess && <p>OK!</p>}
+      {followMutation.error && <p>{followMutation.error.message}</p>}
 
       <button onClick={() => signOut()}>sign out</button>
     </main>

@@ -3,8 +3,10 @@ import { NextPage } from 'next'
 import { useMemo } from 'react'
 import { trpc } from '../utils/trpc'
 import _ from 'lodash'
+import { useSession } from 'next-auth/react'
 
 const Timeline: NextPage = () => {
+  const { data: session } = useSession()
   const { data, isLoading } = trpc.useQuery(['social.timeline.upcoming'])
 
   const groupedActivities = useMemo(() => {
@@ -14,6 +16,10 @@ const Timeline: NextPage = () => {
   }, [data])
 
   const today = useMemo(() => dayjs().startOf('day'), [])
+
+  if (!session?.user) {
+    return null
+  }
 
   if (isLoading) {
     return <p>loading timeline...</p>
@@ -41,11 +47,17 @@ const Timeline: NextPage = () => {
           <div key={startOfDay}>
             <p className='font-bold text-xl'>{title}</p>
             {activities.map((activity) => {
+              const userName =
+                activity.user.id === session.user?.id
+                  ? 'Me'
+                  : activity.user.name ?? 'Unknown'
               return (
-                <>
-                  <p className='text-lg'>{activity.title}</p>
+                <div>
+                  <p>
+                    {userName}: {activity.title}
+                  </p>
                   {activity.location && ` at ${activity.location.name}`}
-                </>
+                </div>
               )
             })}
           </div>
