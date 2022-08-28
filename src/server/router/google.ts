@@ -16,7 +16,16 @@ const getAuthClient = () =>
 const scopes = ['https://www.googleapis.com/auth/calendar']
 
 export const googleRouter = createProtectedRouter()
-  .mutation('authorize', {
+  .query('isAuthorized', {
+    async resolve({ ctx }) {
+      const { user } = ctx.session
+      const userGoogleCreds = await ctx.prisma.googleCredentials.findUnique({
+        where: { userId: user.id }
+      })
+      return !!userGoogleCreds
+    }
+  })
+  .mutation('getAuthUrl', {
     async resolve() {
       const url = getAuthClient().generateAuthUrl({
         access_type: 'offline',

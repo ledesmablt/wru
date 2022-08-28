@@ -12,7 +12,8 @@ const UserProfile: NextPage = () => {
     required: true,
     onUnauthenticated: () => router.push('/')
   })
-  const { mutateAsync: authorizeGoogle } = trpc.useMutation('google.authorize')
+  const { data: isGoogleAuthorized } = trpc.useQuery(['google.isAuthorized'])
+  const { mutateAsync: authorizeGoogle } = trpc.useMutation('google.getAuthUrl')
 
   const [calendarPickerOpen, setCalendarPickerOpen] = useState(false)
 
@@ -29,18 +30,23 @@ const UserProfile: NextPage = () => {
         alt=''
         className='w-12 h-12 rounded-full'
       />
-      <button onClick={() => setCalendarPickerOpen((v) => !v)}>
-        pick calendar
-      </button>
-      {calendarPickerOpen && <CalendarPicker />}
-      <button
-        onClick={async () => {
-          const url = await authorizeGoogle()
-          router.replace(url)
-        }}
-      >
-        authorize
-      </button>
+      {isGoogleAuthorized ? (
+        <>
+          <button onClick={() => setCalendarPickerOpen((v) => !v)}>
+            pick calendar
+          </button>
+          {calendarPickerOpen && <CalendarPicker />}
+        </>
+      ) : (
+        <button
+          onClick={async () => {
+            const url = await authorizeGoogle()
+            router.replace(url)
+          }}
+        >
+          authorize google
+        </button>
+      )}
 
       <button onClick={() => signOut()}>sign out</button>
     </main>

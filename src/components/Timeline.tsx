@@ -19,6 +19,14 @@ const Timeline: NextPage = () => {
     return <p>loading timeline...</p>
   }
 
+  if (!Object.keys(groupedActivities).length) {
+    return (
+      <p>
+        you have no activities on your timeline! go to your profile and sync up
+      </p>
+    )
+  }
+
   return (
     <div className='flex flex-col gap-4'>
       {Object.entries(groupedActivities).map(([startOfDay, activities]) => {
