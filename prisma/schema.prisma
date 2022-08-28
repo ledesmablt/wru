@@ -97,10 +97,13 @@ model Activity {
 }
 
 model Location {
-  id          String     @id @default(cuid())
-  name        String
-  coordinateX Float
-  coordinateY Float
-  geoHash     String
-  activities  Activity[]
+  id                    String     @id @default(cuid())
+  name                  String
+  coordinateLat         Float
+  coordinateLong        Float
+  geoHash               String
+  googleCalendarAddress String
+  mapBoxId              String
+  mapBoxAddress         String
+  activities            Activity[]
 }

@@ -52,11 +52,12 @@ const Timeline: NextPage = () => {
                   ? 'Me'
                   : activity.user.name ?? 'Unknown'
               return (
-                <div>
+                <div key={activity.id}>
                   <p>
                     {userName}: {activity.title}
                   </p>
-                  {activity.location && ` at ${activity.location.name}`}
+                  {activity.location &&
+                    ` at ${activity.location.googleCalendarAddress}`}
                 </div>
               )
             })}

@@ -5,6 +5,9 @@ import { calendar_v3, google } from 'googleapis'
 import { env } from '../../env/server.mjs'
 import dayjs from 'dayjs'
 import { Activity } from '@prisma/client'
+import { mapbox } from '../../utils/mapbox'
+
+import geohash from 'ngeohash'
 
 const getAuthClient = () =>
   new google.auth.OAuth2(
@@ -189,29 +192,45 @@ export const googleAuthorizedRouter = createProtectedRouter()
       const toCreate: ReturnType<typeof formatter>[] = []
       const toDelete: string[] = []
       const toUpdate: { id: string; body: ReturnType<typeof formatter> }[] = []
+
+      const ignoreLocations: { [k: string]: boolean } = {}
       for (const event of events) {
         if (!event.id) {
           continue
         }
         let locationId = ''
         if (event.location) {
-          // TODO: use actual location API, better validation
+          // could improve how this is searched
           const existingLocation = await ctx.prisma.location.findFirst({
-            where: { name: event.location }
+            where: { googleCalendarAddress: event.location }
           })
           if (existingLocation) {
             locationId = existingLocation.id
           } else {
-            // TODO: actual data, insert new location
-            const newLocation = await ctx.prisma.location.create({
-              data: {
-                name: event.location,
-                geoHash: '__random',
-                coordinateX: 0,
-                coordinateY: 0
+            if (!ignoreLocations[event.location]) {
+              const mapboxRes = await mapbox.search(event.location)
+              if (!mapboxRes) {
+                ignoreLocations[event.location] = true
+              } else {
+                const [coordinateLat, coordinateLong] = mapboxRes.center as [
+                  number,
+                  number
+                ]
+                // trust google cal for now
+                const newLocation = await ctx.prisma.location.create({
+                  data: {
+                    name: mapboxRes.text,
+                    mapBoxId: mapboxRes.id,
+                    mapBoxAddress: mapboxRes.place_name,
+                    googleCalendarAddress: event.location,
+                    geoHash: geohash.encode(coordinateLat, coordinateLong),
+                    coordinateLat,
+                    coordinateLong
+                  }
+                })
+                locationId = newLocation.id
               }
-            })
-            locationId = newLocation.id
+            }
           }
         }
         const existingActivity = existingMap[event.id]

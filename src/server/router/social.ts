@@ -74,7 +74,13 @@ export const socialRouter = createProtectedRouter()
           description: true,
           startDateTime: true,
           endDateTime: true,
-          location: true,
+          location: {
+            select: {
+              name: true,
+              mapBoxAddress: true,
+              googleCalendarAddress: true
+            }
+          },
           user: {
             select: {
               id: true,
