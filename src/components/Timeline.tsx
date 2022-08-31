@@ -1,4 +1,9 @@
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
 import { NextPage } from 'next'
 import { useMemo } from 'react'
 import { trpc } from '../utils/trpc'
@@ -7,7 +12,12 @@ import { useSession } from 'next-auth/react'
 
 const Timeline: NextPage = () => {
   const { data: session } = useSession()
-  const { data, isLoading } = trpc.useQuery(['social.timeline.upcoming'])
+  const { data, isLoading } = trpc.useQuery([
+    'social.timeline.upcoming',
+    {
+      timeZone: dayjs.tz.guess()
+    }
+  ])
 
   const groupedActivities = useMemo(() => {
     return _.groupBy(data || [], (a) =>
@@ -34,7 +44,7 @@ const Timeline: NextPage = () => {
   }
 
   return (
-    <div className='flex flex-col gap-4'>
+    <div className='flex flex-col gap-8'>
       {Object.entries(groupedActivities).map(([startOfDay, activities]) => {
         const daysFromToday = dayjs(startOfDay).diff(today, 'days')
         let title = `${daysFromToday} days from now`
@@ -46,21 +56,25 @@ const Timeline: NextPage = () => {
         return (
           <div key={startOfDay}>
             <p className='font-bold text-xl'>{title}</p>
-            {activities.map((activity) => {
-              const userName =
-                activity.user.id === session.user?.id
-                  ? 'Me'
-                  : activity.user.name ?? 'Unknown'
-              return (
-                <div key={activity.id}>
-                  <p>
-                    {userName}: {activity.title}
-                  </p>
-                  {activity.location &&
-                    ` at ${activity.location.googleCalendarAddress}`}
-                </div>
-              )
-            })}
+            <div className='flex flex-col gap-4'>
+              {activities.map((activity) => {
+                const userName =
+                  activity.user.id === session.user?.id
+                    ? 'Me'
+                    : activity.user.name ?? 'Unknown'
+                return (
+                  <div key={activity.id}>
+                    <p>
+                      {userName}: {activity.title}
+                    </p>
+                    <p>
+                      {activity.location && ` at ${activity.location.name}`}
+                    </p>
+                    {activity.isNearMe && <p>(near me today)</p>}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )
       })}
